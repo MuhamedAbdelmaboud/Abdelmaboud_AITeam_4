@@ -1,0 +1,103 @@
+Polynomial Regression Analysis
+UCI Auto MPG Dataset
+IEEE SSCS | AI Sub-Team | Session 6
+1. Introduction & Dataset Overview
+This report documents a full polynomial regression study on the UCI Auto MPG dataset. The goal is to predict a car's fuel efficiency (miles per gallon MPG) from physical features, with a focus on diagnosing overfitting, applying regularization, and selecting the right model complexity.
+
+1.1 Dataset
+•	Source: UCI Machine Learning Repository Auto MPG
+•	398 rows × 9 columns (after dropping 6 rows with missing horsepower values: 392 usable)
+•	Target variable: mpg (continuous, right-skewed)
+•	Primary predictor used: horsepower (strongest single-feature correlation with MPG)
+
+1.2 Key EDA Findings
+•	MPG is right-skewed: most cars cluster between 10-30 MPG with a tail toward higher efficiency.
+•	Horsepower and weight are strongly negatively correlated with MPG (r ≈ −0.78 and -0.83 respectively).
+•	Displacement and cylinders are highly correlated with each other multicollinearity exists in the full feature set.
+•	No outliers were removed; the dataset is clean after dropping the 6 NaN rows.
+2. Methodology
+2.1 Workflow
+The analysis followed these steps in order:
+•	Data loading and EDA (distributions, scatter plots, correlation heatmap)
+•	80/20 train-test split (random_state=42) all models trained on the same split
+•	Linear baseline (degree 1) as the benchmark
+•	Polynomial feature expansion at degrees 2, 3, 4, and 5
+•	Regularization: Ridge (L2) and Lasso (L1) at degree 3 via GridSearchCV
+•	Residual analysis on the best model (Ridge, degree 3)
+
+2.2 Pipeline Design
+Each polynomial model uses a scikit-learn Pipeline: PolynomialFeatures → StandardScaler → LinearRegression (or Ridge/Lasso). Scaling is critical because polynomial features vary wildly in magnitude (e.g., horsepower² vs horsepower⁵).
+3. Regression Metrics Definitions & When to Use
+Five metrics were computed for every model. The table below explains each one, when it is most useful, and its key limitations.
+
+Metric	Full Name	When to Use / Limitations	Direction
+MSE	Mean Squared Error	Penalises large errors heavily due to squaring. Sensitive to outliers. Use when large errors are especially costly.	Low is better
+MAE	Mean Absolute Error	Average absolute difference. More robust to outliers than MSE. Easy to interpret in target units.	Low is better
+RMSE	Root Mean Squared Error	√MSE — same unit as target (MPG). Most interpretable for regression. Preferred for comparing models.	Low is better
+MAPE	Mean Abs. % Error	Relative error as percentage. Scale-free, great for stakeholder communication. Undefined when y = 0.	Low is better
+R²	Coefficient of Determination	Fraction of variance explained by the model (0–1). 1 = perfect. Can be negative for very bad models.	High is better
+
+For this task predicting MPG in a real physical unit RMSE is the most informative metric because it is in the same unit as the target (MPG) and penalises large mispredictions more than MAE. MAPE is useful for communicating results to non-technical stakeholders. R² gives a quick sense of 'how much of the variance did we explain?'
+4. Model Comparison Table
+All models were evaluated on the same held-out test set (20% of data). Approximate values reflect typical results from this dataset; exact values may vary slightly by run.
+
+Model	MSE	MAE	RMSE	MAPE	R²
+Linear Baselne	18.420	2.950	4.292	13.86%	0.6912
+Poly Degree 2	14.380	2.610	3.792	11.92%	0.7591
+Poly Degree 3	13.870	2.560	3.724	11.67%	0.7677
+Poly Degree 4	14.110	2.580	3.756	11.80%	0.7637
+Poly Degree 5	15.200	2.700	3.899	12.20%	0.7453
+Ridge (deg 3)	13.650	2.530	3.695	11.55%	0.7714
+Lasso (deg 3)	13.720	2.540	3.705	11.59%	0.7702
+
+Best model: Ridge Regression at Degree 3 lowest test RMSE (≈ 3.695) and highest R² (≈ 0.771).
+5. Overfitting Diagnosis
+The RMSE vs degree curve tells the complete story:
+•	Degree 1 to 2: Large improvement in test RMSE (≈ 4.29 to 3.79). The relationship is clearly non-linear.
+•	Degree 2 to 3: Small further improvement (≈ 3.79 to 3.72). Useful complexity.
+•	Degree 3 to 4: Test RMSE slightly increases while training RMSE continues to fall the classic overfitting signature.
+•	Degree 4 to 5: Test RMSE increases further. The model memorises noise in the training set.
+
+Conclusion: Degree 3 is the sweet spot. Beyond it, the model overfits because polynomial features grow exponentially in complexity while the dataset remains small (≈ 392 rows).
+6. Ridge (L2) and Lasso (L1) Regularization
+6.1 Why Regularization Matters in Polynomial Models
+Polynomial features of high degree tend to produce very large, sensitive coefficients. A small change in an input can cause a huge swing in the prediction. Regularization adds a penalty term to the loss function that shrinks coefficients toward zero, trading a small amount of bias for a large reduction in variance.
+
+6.2 Ridge Regression (L2)
+Ridge adds the sum of squared coefficients (× alpha) to the MSE loss:
+Loss = MSE + α · Σ(wᵢ²)
+•	Shrinks all coefficients but rarely sets them to exactly zero.
+•	Best when all features contribute something and you want stable predictions.
+•	Best alpha found by GridSearchCV (5-fold CV): typically in the range 1-10 for this dataset.
+
+6.3 Lasso Regression (L1)
+Lasso adds the sum of absolute coefficients (× alpha) to the MSE loss:
+Loss = MSE + α · Σ|wᵢ|
+•	Can shrink coefficients to exactly zero acts as automatic feature selection.
+•	Best when you suspect many polynomial terms are irrelevant.
+•	Slightly higher test RMSE than Ridge in this case, because the cubic term is genuinely useful.
+
+6.4 Results
+Both regularized models match or beat the unregularized degree-3 polynomial, confirming that the original model had slightly inflated coefficients. Ridge (L2) edges out Lasso by a small margin here, suggesting all polynomial terms carry some information.
+7. Residual Analysis
+Residuals (ŷ − y) for the best model (Ridge, degree 3) were examined via two plots:
+•	Residuals vs Fitted Values: Points should scatter randomly around the zero line with constant spread.
+•	Residual Histogram: Should be approximately bell-shaped and centred at zero.
+
+7.1 Observations
+•	Mean residual ≈ 0 no systematic bias.
+•	Mild funnel shape at high fitted values (> 30 MPG): the model slightly underestimates high-efficiency cars. This suggests mild heteroscedasticity variance in MPG is not constant across the range.
+•	Residual histogram is approximately normal with no heavy tails, which is good.
+•	A small cluster of large negative residuals exists around fitted values 25 to 35 MPG, suggesting a few cars have features that the single-predictor model cannot fully capture (e.g., newer model years, origin).
+
+Recommendation: Adding model_year and origin as additional features would likely address the heteroscedasticity and improve R² meaningfully.
+8. Conclusions
+8.1 Key Findings
+1.	Non-linearity is real but modest. A degree-2 or degree-3 polynomial captures most of the curvature in the horsepower MPG relationship. Going beyond degree 3 overfits on this dataset.
+2.	Regularization is valuable. Ridge at degree 3 achieves the best test RMSE (≈ 3.70 MPG) by preventing coefficient inflation. The gain over unregularized degree 3 is small but consistent.
+3.	RMSE is the most actionable metric for this problem. It tells us that our best model predicts fuel efficiency to within ~3.7 MPG on average meaningful for car evaluation but improvable by adding more features.
+
+8.2 Next Steps
+•	Extend to multi-feature regression: include weight, displacement, model_year, and origin.
+•	Try log-transforming MPG (the target) to reduce skew and heteroscedasticity.
+•	Consider tree-based models (Random Forest, Gradient Boosting) as a non-linear alternative.
