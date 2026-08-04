@@ -24,6 +24,8 @@ What is Optuna, and why use it instead of manual tuning?
       randomly guessing or exhaustively trying every combination.
 ===============================================================================
 """
+from xml.parsers.expat import model
+
 import optuna
 from sklearn.datasets import load_breast_cancer
 from sklearn.model_selection import train_test_split, cross_val_score
@@ -64,9 +66,10 @@ def objective(trial):
         random_state=42,
         n_jobs=-1,         
     )
-        scores = cross_val_score(
-        model, X_train, y_train,
-        cv=5, scoring='f1', n_jobs=-1
+
+    scores = cross_val_score(
+            model, X_train, y_train,
+            cv=5, scoring='f1', n_jobs=-1
     )
 
     return scores.mean() 
@@ -75,7 +78,7 @@ def objective(trial):
 study = optuna.create_study(direction='maximize', study_name='rf_f1_optimization')
 study.optimize(objective, n_trials=50, show_progress_bar=True)
 
-print("\n================ Optuna Search Finished ================")
+print("\nOptuna Search Finished")
 print(f"Best CV F1-score (train, 5-fold): {study.best_value:.4f}")
 print("Best hyperparameters found:")
 for param_name, param_value in study.best_params.items():
